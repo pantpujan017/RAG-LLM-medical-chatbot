@@ -43,5 +43,3 @@ docker run -p 8080:8080 \
 └── README.md
 ```
 
-Happy querying! 💬
-```
