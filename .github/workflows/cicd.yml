@@ -1,40 +1,53 @@
-name: Build, push to ACR, deploy to VM
+name: Deploy Application Docker Image to Azure VM
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
 
 jobs:
-  build-push-deploy:
-    runs-on: self-hosted   # the runner we registered on the VM
+  Continuous-Integration:
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Log in to ACR
-      uses: azure/docker-login@v1
-      with:
-        login-server: ${{ secrets.ACR_LOGIN_SERVER }}
-        username: ${{ secrets.ACR_USERNAME }}
-        password: ${{ secrets.ACR_PASSWORD }}
+      - name: Log in to Azure Container Registry
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
 
-    - name: Build & tag image
-      run: |
-        docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/medical-bot:${{ github.sha }} .
-        docker tag ${{ secrets.ACR_LOGIN_SERVER }}/medical-bot:${{ github.sha }} ${{ secrets.ACR_LOGIN_SERVER }}/medical-bot:latest
+      - name: Build, tag, and push image to ACR
+        id: build-image
+        env:
+          IMAGE_TAG: latest
+        run: |
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/medical-bot:$IMAGE_TAG .
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/medical-bot:$IMAGE_TAG
+          echo "image=${{ secrets.ACR_LOGIN_SERVER }}/medical-bot:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-    - name: Push image to ACR
-      run: |
-        docker push ${{ secrets.ACR_LOGIN_SERVER }}/medical-bot:${{ github.sha }}
-        docker push ${{ secrets.ACR_LOGIN_SERVER }}/medical-bot:latest
+  Continuous-Deployment:
+    needs: Continuous-Integration
+    runs-on: self-hosted          # the runner you registered on the Azure VM
+    steps:
+      - name: Log in to ACR from VM
+        run: echo ${{ secrets.ACR_PASSWORD }} | docker login ${{ secrets.ACR_LOGIN_SERVER }} -u ${{ secrets.ACR_USERNAME }} --password-stdin
 
-    - name: Pull & run on VM
-      run: |
-        docker pull ${{ secrets.ACR_LOGIN_SERVER }}/medical-bot:latest
-        docker stop medical-bot || true
-        docker rm medical-bot || true
-        docker run -d \
-          --name medical-bot \
-          -p 8080:8080 \
-          -e PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }} \
-          -e GROQ_API_KEY=${{ secrets.GROQ_API_KEY }} \
-          ${{ secrets.ACR_LOGIN_SERVER }}/medical-bot:latest
+      - name: Pull new image
+        run: docker pull ${{ secrets.ACR_LOGIN_SERVER }}/medical-bot:latest
+
+      - name: Stop old container
+        run: docker stop medical-bot || true
+
+      - name: Remove old container
+        run: docker rm medical-bot || true
+
+      - name: Run Docker Image to serve users
+        run: |
+          docker run -d \
+            --name medical-bot \
+            -p 8080:8080 \
+            -e PINECONE_API_KEY="${{ secrets.PINECONE_API_KEY }}" \
+            -e GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
+            ${{ secrets.ACR_LOGIN_SERVER }}/medical-bot:latest
