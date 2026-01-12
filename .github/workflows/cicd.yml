@@ -1,0 +1,40 @@
+name: Build, push to ACR, deploy to VM
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-push-deploy:
+    runs-on: self-hosted   # the runner we registered on the VM
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Log in to ACR
+      uses: azure/docker-login@v1
+      with:
+        login-server: ${{ secrets.ACR_LOGIN_SERVER }}
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+
+    - name: Build & tag image
+      run: |
+        docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/medical-bot:${{ github.sha }} .
+        docker tag ${{ secrets.ACR_LOGIN_SERVER }}/medical-bot:${{ github.sha }} ${{ secrets.ACR_LOGIN_SERVER }}/medical-bot:latest
+
+    - name: Push image to ACR
+      run: |
+        docker push ${{ secrets.ACR_LOGIN_SERVER }}/medical-bot:${{ github.sha }}
+        docker push ${{ secrets.ACR_LOGIN_SERVER }}/medical-bot:latest
+
+    - name: Pull & run on VM
+      run: |
+        docker pull ${{ secrets.ACR_LOGIN_SERVER }}/medical-bot:latest
+        docker stop medical-bot || true
+        docker rm medical-bot || true
+        docker run -d \
+          --name medical-bot \
+          -p 8080:8080 \
+          -e PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }} \
+          -e GROQ_API_KEY=${{ secrets.GROQ_API_KEY }} \
+          ${{ secrets.ACR_LOGIN_SERVER }}/medical-bot:latest
