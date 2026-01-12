@@ -3,7 +3,7 @@
 AI-powered medical Q&A assistant built with **Flask**, **Pinecone**, **Groq LLM** and **Hugging-Face embeddings**.  
 Ask any health-related question and get instant, evidence-based answers retrieved from trusted medical PDFs.
 
-![Chat UI](Screenshot 2026-01-12 185222.png)
+![Chat UI](Screenshot%202026-01-12%20185222.png)
 
 ## ✨ Features
 - **Retrieval-Augmented Generation** (RAG) – answers grounded in your own medical documents  
