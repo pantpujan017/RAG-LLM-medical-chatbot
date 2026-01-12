@@ -1,0 +1,16 @@
+# -------  0.3.x eco (mutually compatible) -------
+langchain==0.3.26
+langchain-community==0.3.26
+langchain-text-splitters==0.3.11
+langchain-pinecone==0.2.8
+langchain-groq==0.3.8           # newest 0.3-compatible
+langchain-huggingface==0.1.0    # newest 0.3-compatible
+
+# -------  rest of stack -------
+flask==3.1.1
+sentence-transformers==4.1.0
+pypdf==5.6.1
+python-dotenv==1.1.0
+
+# -------  local package -------
+-e .
